@@ -6,12 +6,13 @@
 @File : finetune.py
 """
 import numpy as np
-
+from parse_args import parse_arguments
 from model import FineTune, opt, OptimizeIteration
 from utils import *
 import torch
 import warnings
 warnings.filterwarnings('ignore')
+opt = parse_arguments()
 
 
 def __train_epoch__(loss_fn, model, optimizer, train_dataloader):
@@ -90,12 +91,12 @@ def run_rosmap(opt, seed=4, mode='train'):
     opt.VAE2_save_path = 'checkpoints/vae2_rosmap.pt'
     opt.VAE3_save_path = 'checkpoints/vae3_rosmap.pt'
     opt.NN_save_path = 'checkpoints/neuralnet_rosmap.pt'
-    opt.data_root = r'C:\cx\paper\2022002\code\ROSMAP'
+    opt.data_root = 'ROSMAP'
     opt.MD = mode
     opt.class_type = 'multiple'
     opt.GN_save_path = 'checkpoints/gtcn_rosmap.pt'
     opt.finetune_save_path = 'checkpoints/finetune_rosmap.pt'
-    opt.device = 'cuda'
+    # opt.device = 'cuda'
     opt.LR = 1e-4
     opt.VAE1 = [200, 256, 128]
     opt.VAE2 = [200, 256, 128]
@@ -112,12 +113,12 @@ def run_brca(opt, seed=4, mode='train'):
     opt.VAE2_save_path = 'checkpoints/vae2_brca.pt'
     opt.VAE3_save_path = 'checkpoints/vae3_brca.pt'
     opt.NN_save_path = 'checkpoints/neuralnet_brca.pt'
-    opt.data_root = r'C:\cx\paper\2022002\code\BRCA'
+    opt.data_root = 'BRCA'
     opt.MD = mode
     opt.class_type = 'multiple'
     opt.GN_save_path = 'checkpoints/gtcn_brca.pt'
     opt.finetune_save_path = 'checkpoints/finetune_brca.pt'
-    opt.device = 'cuda'
+    # opt.device = 'cuda'
     opt.LR = 1e-5
     opt.VAE1 = [1000, 512, 128]
     opt.VAE2 = [1000, 512, 128]
@@ -129,13 +130,13 @@ def run_brca(opt, seed=4, mode='train'):
 
 
 if __name__ == "__main__":
-    opt.MD = 'test'
+    # opt.MD = 'test'
     if opt.MD == 'test':
         print('Preparing test ROSMAP dataset.')
         run_rosmap(opt, seed=0, mode=opt.MD)
         print('Preparing test BRCA dataset.')
         run_brca(opt, seed=109, mode=opt.MD)
     elif opt.MD == 'train':
-        # run_rosmap(opt, seed=0, mode=opt.MD)
+        run_rosmap(opt, seed=0, mode=opt.MD)
         run_brca(opt, seed=109, mode=opt.MD)
 

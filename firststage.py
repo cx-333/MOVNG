@@ -128,7 +128,7 @@ def run_brca(opt, seed=4, mode="train"):
     opt.VAE2_save_path = 'checkpoints/vae2_brca.pt'
     opt.VAE3_save_path = 'checkpoints/vae3_brca.pt'
     opt.NN_save_path = 'checkpoints/neuralnet_brca.pt'
-    opt.data_root = r'C:\cx\paper\2022002\code\BRCA'
+    opt.data_root = 'BRCA'
     opt.MD = mode
     opt.class_type = 'multiple'
     opt.VAE1 = [1000, 512, 128]
@@ -137,7 +137,7 @@ def run_brca(opt, seed=4, mode="train"):
     # opt.VAE = [128 * 2 + 64, 128, 64]
     opt.NN = [128, 64, 32, 5]
     opt.LR = 1e-3
-    opt.device = 'cuda'
+    # opt.device = 'cuda'
     # __train__(opt)
     __train_nnet__(opt)
 
@@ -149,7 +149,7 @@ def run_rosmap(opt, seed=4, mode="train"):
     opt.VAE2_save_path = 'checkpoints/vae2_rosmap.pt'
     opt.VAE3_save_path = 'checkpoints/vae3_rosmap.pt'
     opt.NN_save_path = 'checkpoints/neuralnet_rosmap.pt'
-    opt.data_root = r'C:\cx\paper\2022002\code\ROSMAP'
+    opt.data_root = 'ROSMAP'
     opt.MD = mode
     opt.class_type = 'multiple'
     opt.VAE1 = [200, 256, 128]
@@ -158,18 +158,18 @@ def run_rosmap(opt, seed=4, mode="train"):
     # opt.VAE = [128 * 2 + 64, 128, 64]
     opt.NN = [128, 40, 32, 2]
     opt.LR = 1e-3
-    opt.device = 'cuda'
+    # opt.device = 'cuda'
     # __train__(opt)
     __train_nnet__(opt)
 
 
 if __name__ == "__main__":
-    opt.MD = 'train'
+    # opt.MD = 'train'
     if opt.MD == 'test':
         print('Preparing test ROSMAP dataset.')
         run_rosmap(opt, seed=4, mode=opt.MD)
         print('Preparing test BRCA dataset.')
         run_brca(opt, seed=4, mode=opt.MD)
     elif opt.MD == 'train':
-        # run_rosmap(opt, seed=4, mode=opt.MD)
+        run_rosmap(opt, seed=4, mode=opt.MD)
         run_brca(opt, seed=201, mode=opt.MD)
