@@ -11,6 +11,9 @@ import torch
 from torch import Tensor, nn
 from sklearn.metrics import accuracy_score, f1_score, recall_score
 import numpy as np
+from math import sqrt
+from dataset import PublicDataset
+from torch.utils.data import DataLoader
 
 
 def get_GTCN_g(A: Tensor, device) -> dict:
@@ -43,15 +46,36 @@ def get_adj(x):
     size = len(x)
     adj = torch.eye(size, size)
     i = 0
-    while (i < size):
+    while i < size:
         j = i
-        while (j < size):
-            if (x[i] == x[j]):
+        while j < size:
+            if x[i] == x[j]:
                 adj[i, j] = 1
                 adj[j, i] = 1
             j += 1
         i += 1
     return adj
+
+
+def get_adj1(x: Tensor):
+    if type(x) != Tensor:
+        raise TypeError('Except tensor, but got {0}'.format(type(x)))
+    x_len = len(x)
+    token = []
+    i = 0
+    while len(token) < x_len:
+        if int(sqrt(i)) ** 2 != i:
+            token.append(i)
+        i += 1
+    token = torch.tensor(token)
+    xO = torch.mul(x.reshape(1, -1), torch.sqrt(token))
+    xT = xO.T
+    temp = torch.matmul(xT, xO)
+    b = torch.sqrt(temp)
+    result = torch.empty(temp.shape)
+    result[b % xO != 0.0] = 0
+    result[b % xO == 0.0] = 1
+    return result
 
 
 def separate(A, norm_type=1):
@@ -119,9 +143,17 @@ def vae_ls(mean, log_var, recon_x, x):
     return recon_ls + kl
 
 
+def proposed_vae_ls(mean, log_var, recon_x, x):
+    recon_ls = 0
+    for rex, trx in zip(recon_x, x):
+        recon_ls += nn.functional.binary_cross_entropy(rex, trx)
+    kl = - 0.5 * torch.sum(log_var - log_var.exp() - mean.pow(2) + 1)
+    return recon_ls + kl
+
+
 def movng_ls(mean, log_var, recon_x, x,
              y_pre1, y_pre2, target,
-             alpha, beta, gamma):
+             alpha=1, beta=1, gamma=1):
     ls1 = vae_ls(mean, log_var, recon_x, x)
     ls2 = multi_class_ls(y_pre1, target)
     ls3 = multi_class_ls(y_pre2, target)
@@ -139,24 +171,24 @@ def is_sklearn_processed(x):
 def accuracy(y_pre, y_true, normalize: bool = True):
     if not is_sklearn_processed(y_pre) or \
        not is_sklearn_processed(y_true):
-        y_pre = np.array(y_pre)
-        y_true = np.array(y_true)
+        y_pre = np.array(y_pre.cpu())
+        y_true = np.array(y_true.cpu())
     return accuracy_score(y_true, y_pre, normalize=normalize)
 
 
 def compute_f1(y_pre, y_true, average: str = 'weighted'):
     if not is_sklearn_processed(y_pre) or \
        not is_sklearn_processed(y_true):
-        y_pre = np.array(y_pre)
-        y_true = np.array(y_true)
+        y_pre = np.array(y_pre.cpu())
+        y_true = np.array(y_true.cpu())
     return f1_score(y_true, y_pre, average=average)
 
 
 def recall(y_pre, y_true, average: str = 'weighted'):
     if not is_sklearn_processed(y_pre) or \
        not is_sklearn_processed(y_true):
-        y_pre = np.array(y_pre)
-        y_true = np.array(y_true)
+        y_pre = np.array(y_pre.cpu())
+        y_true = np.array(y_true.cpu())
     return recall_score(y_true, y_pre, average=average)
 
 
@@ -208,3 +240,70 @@ def prepare_trte_data(data_folder, device):
     labels = np.concatenate((labels_tr, labels_te))
     return data_train_list, data_test_list, idx_dict, labels
 
+
+def one_hot_tensor(y, num_dim):
+    y_onehot = torch.zeros(y.shape[0], num_dim)
+    y_onehot.scatter_(1, y.view(-1, 1), 1)
+    return y_onehot
+
+
+def single_sparse_ls(mean, log_var, recon_x, x, y_pred, label, class_type='multiple'):
+    ls1 = vae_ls(mean, log_var, recon_x, x)
+    if class_type == 'multiple':
+        ls2 = multi_class_ls(y_pred, label)
+    else:
+        ls2 = binary_class_ls(y_pred, label)
+    return ls1 + ls2
+
+
+def first_stage_ls(mean, log_var, recon_x, x, y_pred, label, class_type='multiple'):
+    ls1 = proposed_vae_ls(mean, log_var, recon_x, x)
+    if class_type == 'multiple':
+        ls2 = multi_class_ls(y_pred, label)
+    else:
+        ls2 = binary_class_ls(y_pred, label)
+    return ls1 + ls2
+
+
+def second_stage_ls(y_pred, label, class_type='multiple'):
+    if class_type == 'multiple':
+        return multi_class_ls(y_pred, label)
+    else:
+        return binary_class_ls(y_pred, label)
+
+
+def binary_class_ls(y_pred, y_true):
+    y_indices = prob2class(y_pred)
+    y_indices = torch.tensor(y_indices, dtype=torch.float)
+    y_true = torch.tensor(y_true, dtype=torch.float)
+    return torch.nn.functional.binary_cross_entropy(y_indices, y_true)
+
+
+def save_checkpoint(model, checkpoint_path):
+    # os.makedirs(checkpoint_path, exist_ok=True)
+    filename = os.path.join(checkpoint_path)
+    torch.save(model.state_dict(), filename)
+    # print(f"{filename} saved !!!")
+
+
+def load_checkpoint(model, path):
+    best_checkpoint = torch.load(path)
+    model.load_state_dict(best_checkpoint)
+
+
+def generate_dataloader(dataset_folder, batch_size, device):
+    data_tr_list, data_test_list, trte_idx, labels_trte = prepare_trte_data(dataset_folder, device)
+    train_data = PublicDataset(data_tr_list, labels_trte[trte_idx["tr"]])
+    test_data = PublicDataset(data_test_list, labels_trte[trte_idx["te"]])
+    train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+    return train_dataloader, test_dataloader
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+
+if __name__ == '__main__':
+    pass
