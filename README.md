@@ -40,4 +40,4 @@ python finetune.py --device cpu or cuda --MD test
 
 # Contact
 
-For any questions, feel free to contact: `cxregion.@163.com`
+For any questions, feel free to contact: `cxregion@163.com`
